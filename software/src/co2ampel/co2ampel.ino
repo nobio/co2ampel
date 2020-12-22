@@ -79,6 +79,46 @@
 #include <Wire.h>
 
 /**********************************************************************************************************************/
+/* Hardware Pins */
+/**********************************************************************************************************************/
+#define LED_GOOD_PIN INT8_C(14)  // GPIO14 -> D5
+#define LED_BAD_PIN INT8_C(12)   // GPIO12 -> D6
+#define LED_STATE_PIN INT8_C(13) // GPIO13 -> D7
+#define BUTTON_PIN INT8_C(15)    // GPIO15 -> D8
+
+/**********************************************************************************************************************/
+/* local variables */
+/**********************************************************************************************************************/
+
+/* LED status */
+#define LED_OFF INT8_C(-1)
+#define LED_ON INT8_C(0)
+#define LED_BLINK_SLOW INT8_C(1)
+#define LED_BLINK_FAST INT8_C(2)
+
+int8_t led_good_status = LED_OFF;
+int8_t led_bad_status = LED_OFF;
+int8_t led_state_status = LED_BLINK_SLOW;
+
+/* push button status */
+#define BUTTON_UP INT8_C(-1)
+#define BUTTON_DOWN INT8_C(1)
+
+int8_t push_button_status = BUTTON_UP;
+
+/* IAQ Accuracy */
+#define IAQ_ACCURACY_INIT INT8_C(0)
+#define IAQ_ACCURACY_OK INT8_C(1)
+#define IAQ_ACCURACY_IN_CALIBRATION INT8_C(2)
+#define IAQ_ACCURACY_CALIBRATED INT8_C(3)
+
+int8_t last_iaq_accuracy = IAQ_ACCURACY_INIT;
+
+/* Timestamp variables */
+/* get the timestamp in nanoseconds before calling bsec_sensor_control() */
+int64_t time_stamp = 0;
+
+/**********************************************************************************************************************/
 /* functions */
 /**********************************************************************************************************************/
 
@@ -94,15 +134,16 @@
  */
 int8_t bus_write(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data_ptr, uint16_t data_len)
 {
-    Wire.beginTransmission(dev_addr);
-    Wire.write(reg_addr);    /* Set register address to start writing to */
- 
-    /* Write the data */
-    for (int index = 0; index < data_len; index++) {
-        Wire.write(reg_data_ptr[index]);
-    }
- 
-    return (int8_t)Wire.endTransmission();
+  Wire.beginTransmission(dev_addr);
+  Wire.write(reg_addr); /* Set register address to start writing to */
+
+  /* Write the data */
+  for (int index = 0; index < data_len; index++)
+  {
+    Wire.write(reg_data_ptr[index]);
+  }
+
+  return (int8_t)Wire.endTransmission();
 }
 
 /*!
@@ -117,22 +158,22 @@ int8_t bus_write(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data_ptr, uint
  */
 int8_t bus_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data_ptr, uint16_t data_len)
 {
-    int8_t comResult = 0;
-    Wire.beginTransmission(dev_addr);
-    Wire.write(reg_addr);                    /* Set register address to start reading from */
-    comResult = Wire.endTransmission();
- 
-    delayMicroseconds(150);                 /* Precautionary response delay */
-    Wire.requestFrom(dev_addr, (uint8_t)data_len);    /* Request data */
- 
-    int index = 0;
-    while (Wire.available())  /* The slave device may send less than requested (burst read) */
-    {
-        reg_data_ptr[index] = Wire.read();
-        index++;
-    }
- 
-    return comResult;
+  int8_t comResult = 0;
+  Wire.beginTransmission(dev_addr);
+  Wire.write(reg_addr); /* Set register address to start reading from */
+  comResult = Wire.endTransmission();
+
+  delayMicroseconds(150);                        /* Precautionary response delay */
+  Wire.requestFrom(dev_addr, (uint8_t)data_len); /* Request data */
+
+  int index = 0;
+  while (Wire.available()) /* The slave device may send less than requested (burst read) */
+  {
+    reg_data_ptr[index] = Wire.read();
+    index++;
+  }
+
+  return comResult;
 }
 
 /*!
@@ -144,7 +185,7 @@ int8_t bus_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data_ptr, uint1
  */
 void sleep(uint32_t t_ms)
 {
-    delay(t_ms);
+  delay(t_ms);
 }
 
 /*!
@@ -154,7 +195,184 @@ void sleep(uint32_t t_ms)
  */
 int64_t get_timestamp_us()
 {
-    return (int64_t) millis() * 1000;
+  return (int64_t)millis() * 1000;
+}
+
+/*!
+ * @brief           Load previous library state from non-volatile memory
+ *
+ * @param[in,out]   state_buffer    buffer to hold the loaded state string
+ * @param[in]       n_buffer        size of the allocated state buffer
+ *
+ * @return          number of bytes copied to state_buffer
+ */
+uint32_t state_load(uint8_t *state_buffer, uint32_t n_buffer)
+{
+  // ...
+  // Load a previous library state from non-volatile memory, if available.
+  //
+  // Return zero if loading was unsuccessful or no state was available,
+  // otherwise return length of loaded state string.
+  // ...
+  return 0;
+}
+
+/*!
+ * @brief           Save library state to non-volatile memory
+ *
+ * @param[in]       state_buffer    buffer holding the state to be stored
+ * @param[in]       length          length of the state string to be stored
+ *
+ * @return          none
+ */
+void state_save(const uint8_t *state_buffer, uint32_t length)
+{
+  // ...
+  // Save the string some form of non-volatile memory, if possible.
+  // ...
+}
+
+/*!
+ * @brief           Load library config from non-volatile memory
+ *
+ * @param[in,out]   config_buffer    buffer to hold the loaded state string
+ * @param[in]       n_buffer        size of the allocated state buffer
+ *
+ * @return          number of bytes copied to config_buffer
+ */
+uint32_t config_load(uint8_t *config_buffer, uint32_t n_buffer)
+{
+  // ...
+  // Load a library config from non-volatile memory, if available.
+  //
+  // Return zero if loading was unsuccessful or no config was available,
+  // otherwise return length of loaded config string.
+  // ...
+  return 0;
+}
+
+/*!
+ * @brief       Main function which configures BSEC library and then reads and processes the data from sensor based
+ *              on timer ticks
+ *
+ * @return      result of the processing
+ */
+void setup()
+{
+  return_values_init ret;
+
+  /* Init the PED Pins */
+  pinMode(LED_GOOD_PIN, OUTPUT);
+  pinMode(LED_BAD_PIN, OUTPUT);
+  pinMode(LED_STATE_PIN, OUTPUT);
+
+  /* Init Button Pin */
+  pinMode(BUTTON_PIN, INPUT);
+
+  /* Init I2C and serial communication */
+  Wire.begin(0, 2);
+  Serial.begin(115200);
+
+  /* Call to the function which initializes the BSEC library 
+     * Switch on low-power mode and provide no temperature offset */
+  ret = bsec_iot_init(BSEC_SAMPLE_RATE_LP, 0.0f, bus_write, bus_read, sleep, state_load, config_load);
+  if (ret.bme680_status)
+  {
+    /* Could not intialize BME680 */
+    Serial.println("Error while initializing BME680");
+    return;
+  }
+  else if (ret.bsec_status)
+  {
+    /* Could not intialize BSEC library */
+    Serial.println("Error while initializing BSEC library");
+    return;
+  }
+
+  time_stamp = get_timestamp_us() * 1000;
+
+  /* Call to endless loop function which reads and processes data based on sensor settings */
+  /* State is saved every 10.000 samples, which means every 10.000 * 3 secs = 500 minutes  */
+  bsec_iot_loop(sleep, get_timestamp_us, output_ready, state_save, button_state, 10000);
+}
+
+/*!
+ * @brief       funtion to read the state of the push button
+ *
+ * @return      status of push button (BUTTON_UP or BUTTON_DOWN)
+ */
+int8_t button_state()
+{
+  return digitalRead(BUTTON_PIN); // read the pushButton State
+}
+
+void loop()
+{
+  // nothing to do; all magic happens in bsec_iot_loop which calls back to output_ready(...)
+}
+
+/* ========================================================================== */
+/*                                 LOCAL FUNCTIONS
+/* ========================================================================== */
+
+void handle_led()
+{
+  /* --------------- LED-GOOD -------------------- */
+  if (led_good_status == LED_OFF)
+  {
+    // switch off LED_GOOD
+    digitalWrite(LED_GOOD_PIN, LOW);
+  }
+  else if (led_good_status == LED_OFF)
+  {
+    // switch on LED_GOOD
+    digitalWrite(LED_GOOD_PIN, HIGH);
+  }
+  /* ----------------- LED-BAD -------------------- */
+  if (led_bad_status == LED_OFF)
+  {
+    // switch off BAD
+    digitalWrite(LED_BAD_PIN, LOW);
+  }
+  else if (led_bad_status == LED_ON)
+  {
+    // switch on BAD
+    digitalWrite(LED_BAD_PIN, HIGH);
+  }
+  /* ---------------- LED_STATE ------------------- */
+  if (led_state_status == LED_OFF)
+  {
+    // switch off STATE
+    digitalWrite(LED_STATE_PIN, LOW);
+  }
+  else if (led_state_status == LED_OFF)
+  {
+    // switch on STATE
+    digitalWrite(LED_STATE_PIN, HIGH);
+  }
+  else if (led_state_status == LED_BLINK_SLOW)
+  {
+    // blink slow STATE
+    digitalWrite(LED_STATE_PIN, HIGH);
+    delay(500);
+    digitalWrite(LED_STATE_PIN, LOW);
+  }
+  else if (led_state_status == LED_BLINK_FAST)
+  {
+    // blink fast STATE
+    digitalWrite(LED_STATE_PIN, HIGH);
+    delay(100);
+    digitalWrite(LED_STATE_PIN, LOW);
+  }
+  /* ----------------------------------------------- */
+
+  Serial.print("LED_BAD: ");
+  Serial.print(led_bad_status);
+  Serial.print(", LED_GOOD: ");
+  Serial.print(led_good_status);
+  Serial.print(", LED_STATE: ");
+  Serial.print(led_state_status);
+  Serial.println();
 }
 
 /*!
@@ -174,113 +392,70 @@ int64_t get_timestamp_us()
  * @return          none
  */
 void output_ready(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temperature, float humidity,
-     float pressure, float raw_temperature, float raw_humidity, float gas, bsec_library_return_t bsec_status)
+                  float pressure, float raw_temperature, float raw_humidity, float gas, int8_t button_state, bsec_library_return_t bsec_status)
 {
-    Serial.print("[");
-    Serial.print(timestamp/1e6);
-    Serial.print("] T: ");
-    Serial.print(temperature);
-    Serial.print(" | rH: ");
-    Serial.print(humidity);
-    Serial.print(" | IAQ: ");
+  Serial.print("iaq=");
+  Serial.print(iaq);
+  Serial.print(", iaq_accuracy=");
+  Serial.print(iaq_accuracy);
+  Serial.print(", bsec_status=");
+  Serial.print(bsec_status);
+  Serial.print(", button_state=");
+  Serial.print(button_state);
+  Serial.print(" -> ");
+  if (iaq_accuracy != IAQ_ACCURACY_INIT && bsec_status == BSEC_OK)
+  {
+    /* status switch from 0 to 1/2/3 -> switch off blinking */
+    if (last_iaq_accuracy == 0 && iaq_accuracy != last_iaq_accuracy)
+    {
+      led_state_status = LED_OFF;
+    }
+
+    /* ... */
+    if (iaq <= 150) // trigger level:
+    {
+      led_bad_status = LED_OFF;
+      led_good_status = LED_ON;
+    }
+    else
+    {
+      led_bad_status = LED_ON;
+      led_good_status = LED_OFF;
+    }
+  }
+  else if (iaq_accuracy == IAQ_ACCURACY_INIT) /* ramp up phase*/
+  {
+    led_state_status = LED_BLINK_SLOW;
+  }
+
+  /* switch on/off LEDs */
+  handle_led();
+
+  /* store last iaq_qccuracy */
+  last_iaq_accuracy = iaq_accuracy;
+
+  /*
+    Serial.print(timestamp / 1e6);
+    Serial.print(" - iaq: ");
     Serial.print(iaq);
-    Serial.print(" | GSS: ");
-    Serial.print(gas);
-    Serial.print(" (");
+    Serial.print(" - iaq_accuracy: ");
     Serial.print(iaq_accuracy);
-    Serial.println(")");
-}
-
-/*!
- * @brief           Load previous library state from non-volatile memory
- *
- * @param[in,out]   state_buffer    buffer to hold the loaded state string
- * @param[in]       n_buffer        size of the allocated state buffer
- *
- * @return          number of bytes copied to state_buffer
- */
-uint32_t state_load(uint8_t *state_buffer, uint32_t n_buffer)
-{
-    // ...
-    // Load a previous library state from non-volatile memory, if available.
-    //
-    // Return zero if loading was unsuccessful or no state was available, 
-    // otherwise return length of loaded state string.
-    // ...
-    return 0;
-}
-
-/*!
- * @brief           Save library state to non-volatile memory
- *
- * @param[in]       state_buffer    buffer holding the state to be stored
- * @param[in]       length          length of the state string to be stored
- *
- * @return          none
- */
-void state_save(const uint8_t *state_buffer, uint32_t length)
-{
-    // ...
-    // Save the string some form of non-volatile memory, if possible.
-    // ...
-}
-
-/*!
- * @brief           Load library config from non-volatile memory
- *
- * @param[in,out]   config_buffer    buffer to hold the loaded state string
- * @param[in]       n_buffer        size of the allocated state buffer
- *
- * @return          number of bytes copied to config_buffer
- */
-uint32_t config_load(uint8_t *config_buffer, uint32_t n_buffer)
-{
-    // ...
-    // Load a library config from non-volatile memory, if available.
-    //
-    // Return zero if loading was unsuccessful or no config was available, 
-    // otherwise return length of loaded config string.
-    // ...
-    return 0;
-}
-
-/*!
- * @brief       Main function which configures BSEC library and then reads and processes the data from sensor based
- *              on timer ticks
- *
- * @return      result of the processing
- */
-void setup()
-{
-    return_values_init ret;
-
-    /* Init I2C and serial communication */
-    Wire.begin(0,2);
-    Serial.begin(115200);
-  
-    /* Call to the function which initializes the BSEC library 
-     * Switch on low-power mode and provide no temperature offset */
-    ret = bsec_iot_init(BSEC_SAMPLE_RATE_LP, 0.0f, bus_write, bus_read, sleep, state_load, config_load);
-    if (ret.bme680_status)
-    {
-        /* Could not intialize BME680 */
-        Serial.println("Error while initializing BME680");
-        return;
-    }
-    else if (ret.bsec_status)
-    {
-        /* Could not intialize BSEC library */
-        Serial.println("Error while initializing BSEC library");
-        return;
-    }
-    
-    /* Call to endless loop function which reads and processes data based on sensor settings */
-    /* State is saved every 10.000 samples, which means every 10.000 * 3 secs = 500 minutes  */
-    bsec_iot_loop(sleep, get_timestamp_us, output_ready, state_save, 10000);
-}
-
-void loop()
-{
+    Serial.print(" - temperature: ");
+    Serial.print(temperature);
+    Serial.print(" - humidity: ");
+    Serial.print(humidity);
+    Serial.print(" - pressure: ");
+    Serial.print(pressure);
+    Serial.print(" - raw_temperature: ");
+    Serial.print(raw_temperature);
+    Serial.print(" - raw_humidity: ");
+    Serial.print(raw_humidity);
+    Serial.print(" - gas: ");
+    Serial.print(gas);
+    Serial.print(" - bsec_status: ");
+    Serial.print(bsec_status);
+    Serial.println();
+    */
 }
 
 /*! @}*/

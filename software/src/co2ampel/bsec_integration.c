@@ -363,7 +363,7 @@ static void bme680_bsec_read_data(int64_t time_stamp_trigger, bsec_input_t *inpu
  *
  * @return      none
  */
-static void bme680_bsec_process_data(bsec_input_t *bsec_inputs, uint8_t num_bsec_inputs, output_ready_fct output_ready)
+static void bme680_bsec_process_data(bsec_input_t *bsec_inputs, uint8_t num_bsec_inputs, output_ready_fct output_ready, push_button_fct button_state)
 {
     /* Output buffer set to the maximum virtual sensor outputs supported */
     bsec_output_t bsec_outputs[BSEC_NUMBER_OUTPUTS];
@@ -431,9 +431,12 @@ static void bme680_bsec_process_data(bsec_input_t *bsec_inputs, uint8_t num_bsec
             timestamp = bsec_outputs[index].time_stamp;
         }
         
+        /* read the button state */
+        int8_t push_button_state = button_state();
+
         /* Pass the extracted outputs to the user provided output_ready() function. */
         output_ready(timestamp, iaq, iaq_accuracy, temp, humidity, raw_pressure, raw_temp, 
-            raw_humidity, raw_gas, bsec_status);
+            raw_humidity, raw_gas, push_button_state, bsec_status);
     }
 }
 
@@ -449,7 +452,7 @@ static void bme680_bsec_process_data(bsec_input_t *bsec_inputs, uint8_t num_bsec
  * @return      none
  */
 void bsec_iot_loop(sleep_fct sleep, get_timestamp_us_fct get_timestamp_us, output_ready_fct output_ready,
-                    state_save_fct state_save, uint32_t save_intvl)
+                    state_save_fct state_save, push_button_fct button_state, uint32_t save_intvl)
 {
     /* Timestamp variables */
     int64_t time_stamp = 0;
@@ -488,7 +491,7 @@ void bsec_iot_loop(sleep_fct sleep, get_timestamp_us_fct get_timestamp_us, outpu
         bme680_bsec_read_data(time_stamp, bsec_inputs, &num_bsec_inputs, sensor_settings.process_data);
         
         /* Time to invoke BSEC to perform the actual processing */
-        bme680_bsec_process_data(bsec_inputs, num_bsec_inputs, output_ready);
+        bme680_bsec_process_data(bsec_inputs, num_bsec_inputs, output_ready, button_state);
         
         /* Increment sample counter */
         n_samples++;
