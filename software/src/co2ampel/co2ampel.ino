@@ -79,6 +79,8 @@
 #include "IAQFifo.h"
 #include <Wire.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+// #include <Arduino_JSON.h>
 
 /**********************************************************************************************************************/
 /* Hardware Pins */
@@ -411,6 +413,49 @@ void connectWifi()
     Serial.println(WiFi.localIP()); // Send the IP address of the ESP8266 to the computer
 }
 
+void sendData(int64_t timestamp, float iaq, float iaqSmoothed, uint8_t iaq_accuracy, float temperature, float humidity, float pressure, float gas)
+{
+    // try to reconnect three times if not connected
+    for (int n = 0; n < 3 && WiFi.status() != WL_CONNECTED; n++)
+    {
+        connectWifi();
+    }
+
+    if (WiFi.status() == WL_CONNECTED)
+    {
+        HTTPClient http;
+        http.begin("http://raspbox:1880/api/test");
+        http.addHeader("Content-Type", "application/json");
+
+        String body;
+        body += F("{\"iaq_accuracy\":\"");
+        body += iaq_accuracy;
+        body += F("\",\"iaq\":\"");
+        body += String(iaq, 2);
+        body += F("\",\"iaqSmoothed\":\"");
+        body += String(iaqSmoothed, 2);
+        body += F("\",\"temperature\":\"");
+        body += String(temperature, 2);
+        body += F("\",\"humidity\":\"");
+        body += String(humidity, 2);
+        body += F("\",\"pressure\":\"");
+        body += String(pressure, 2);
+        body += F("\",\"gas\":\"");
+        body += String(gas, 2);
+        body += F("\"}");
+
+        int httpResponseCode = http.POST(body);
+        http.end();
+
+        Serial.print("; status code: ");
+        Serial.print(httpResponseCode);
+    }
+    else
+    {
+        Serial.println("Error in WiFi connection");
+    }
+}
+
 /* ========================================================================== */
 /*                          END OF LOCAL FUNCTIONS
 /* ========================================================================== */
@@ -494,6 +539,9 @@ void output_ready(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temp
     }
     Serial.print(", smoothed_iaq=");
     Serial.print(iaqFifo.average());
+
+    /* send the data to a server or file or where ever */
+    sendData(timestamp, iaq, iaqFifo.average(), iaq_accuracy, temperature, humidity, pressure, gas);
 
     /* switch on/off LEDs */
     handle_led();
