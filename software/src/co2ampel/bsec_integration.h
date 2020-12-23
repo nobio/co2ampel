@@ -101,7 +101,7 @@ typedef int64_t (*get_timestamp_us_fct)();
 
 /* function pointer to the function processing obtained BSEC outputs */
 typedef void (*output_ready_fct)(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temperature, float humidity,
-    float pressure, float raw_temperature, float raw_humidity, float gas, int8_t button_state, bsec_library_return_t bsec_status);
+    float pressure, float raw_temperature, float raw_humidity, float gas, bsec_library_return_t bsec_status);
 
 /* function pointer to the function loading a previous BSEC state from NVM */
 typedef uint32_t (*state_load_fct)(uint8_t *state_buffer, uint32_t n_buffer);
@@ -111,9 +111,6 @@ typedef void (*state_save_fct)(const uint8_t *state_buffer, uint32_t length);
 
 /* function pointer to the function loading the BSEC configuration string from NVM */
 typedef uint32_t (*config_load_fct)(uint8_t *state_buffer, uint32_t n_buffer);
-
-/* function pointer to button status function */
-typedef int8_t (*push_button_fct)();
 
 /* structure definitions */
 
@@ -155,7 +152,7 @@ return_values_init bsec_iot_init(float sample_rate, float temperature_offset, bm
  * @return      return_values_init	struct with the result of the API and the BSEC library
  */ 
 void bsec_iot_loop(sleep_fct sleep, get_timestamp_us_fct get_timestamp_us, output_ready_fct output_ready,
-    state_save_fct state_save, push_button_fct button_state, uint32_t save_intvl);
+    state_save_fct state_save, uint32_t save_intvl);
 
 #ifdef __cplusplus
 }

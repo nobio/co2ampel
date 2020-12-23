@@ -83,7 +83,6 @@
 /**********************************************************************************************************************/
 #define LED_GOOD_PIN INT8_C(12) // GPIO12 -> D6
 #define LED_BAD_PIN INT8_C(13)  // GPIO13 -> D7
-#define BUTTON_PIN INT8_C(15)   // GPIO15 -> D8
 
 /**********************************************************************************************************************/
 /* local variables */
@@ -96,12 +95,6 @@
 #define STATE_RAMPUP INT8_C(9)
 
 int8_t state = STATE_RAMPUP;
-
-/* push button status */
-#define BUTTON_UP INT8_C(-1)
-#define BUTTON_DOWN INT8_C(1)
-
-int8_t push_button_status = BUTTON_UP;
 
 /* IAQ Accuracy */
 #define IAQ_ACCURACY_INIT INT8_C(0)
@@ -260,9 +253,6 @@ void setup()
     pinMode(LED_GOOD_PIN, OUTPUT);
     pinMode(LED_BAD_PIN, OUTPUT);
 
-    /* Init Button Pin */
-    pinMode(BUTTON_PIN, INPUT);
-
     /* Init I2C and serial communication */
     Wire.begin(0, 2);
     Serial.begin(115200);
@@ -287,17 +277,7 @@ void setup()
 
     /* Call to endless loop function which reads and processes data based on sensor settings */
     /* State is saved every 10.000 samples, which means every 10.000 * 3 secs = 500 minutes  */
-    bsec_iot_loop(sleep, get_timestamp_us, output_ready, state_save, button_state, 10000);
-}
-
-/*!
- * @brief       funtion to read the state of the push button
- *
- * @return      status of push button (BUTTON_UP or BUTTON_DOWN)
- */
-int8_t button_state()
-{
-    return digitalRead(BUTTON_PIN); // read the pushButton State
+    bsec_iot_loop(sleep, get_timestamp_us, output_ready, state_save, 10000);
 }
 
 void loop()
@@ -397,7 +377,7 @@ void handle_led()
  * @return          none
  */
 void output_ready(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temperature, float humidity,
-                  float pressure, float raw_temperature, float raw_humidity, float gas, int8_t button_state, bsec_library_return_t bsec_status)
+                  float pressure, float raw_temperature, float raw_humidity, float gas, bsec_library_return_t bsec_status)
 {
     Serial.print("iaq=");
     Serial.print(iaq);
@@ -405,8 +385,6 @@ void output_ready(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temp
     Serial.print(iaq_accuracy);
     Serial.print(", bsec_status=");
     Serial.print(bsec_status);
-    Serial.print(", button_state=");
-    Serial.print(button_state);
 
     if (bsec_status == BSEC_OK)
     {
