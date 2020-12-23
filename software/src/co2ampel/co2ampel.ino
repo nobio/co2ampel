@@ -76,8 +76,9 @@
 /**********************************************************************************************************************/
 
 #include "bsec_integration.h"
-#include <Wire.h>
 #include "IAQFifo.h"
+#include <Wire.h>
+#include <WiFi.h>
 
 /**********************************************************************************************************************/
 /* Hardware Pins */
@@ -106,10 +107,6 @@ int8_t state = STATE_RAMPUP;
 #define IAQ_ACCURACY_OK INT8_C(1)
 #define IAQ_ACCURACY_IN_CALIBRATION INT8_C(2)
 #define IAQ_ACCURACY_CALIBRATED INT8_C(3)
-
-/* Timestamp variables */
-/* get the timestamp in nanoseconds before calling bsec_sensor_control() */
-int64_t time_stamp = 0;
 
 /* Init Ring Buffer */
 IAQFifo<10> iaqFifo; //store 10 floats
@@ -281,8 +278,9 @@ void setup()
         return;
     }
 
-    time_stamp = get_timestamp_us() * 1000;
+    scanNetworks();
 
+    
     /* Call to endless loop function which reads and processes data based on sensor settings */
     /* State is saved every 10.000 samples, which means every 10.000 * 3 secs = 500 minutes  */
     bsec_iot_loop(sleep, get_timestamp_us, output_ready, state_save, 10000);
@@ -368,6 +366,28 @@ void handle_led()
     Serial.print(")");
     Serial.println();
 }
+
+void scanNetworks()
+{
+    // scan for nearby networks:
+    Serial.println("** Scan Networks **");
+    byte numSsid = WiFi.scanNetworks();
+
+    // print the list of networks seen:
+    Serial.print("SSID List:");
+    Serial.println(numSsid);
+    // print the network number and name for each network found:
+    for (int thisNet = 0; thisNet < numSsid; thisNet++)
+    {
+        Serial.print(thisNet);
+        Serial.print(") Network: ");
+        Serial.println(WiFi.SSID(thisNet));
+    }
+}
+
+/* ========================================================================== */
+/*                          END OF LOCAL FUNCTIONS
+/* ========================================================================== */
 
 /*!
  * @brief           Handling of the ready outputs
