@@ -81,24 +81,21 @@
 /**********************************************************************************************************************/
 /* Hardware Pins */
 /**********************************************************************************************************************/
-#define LED_GOOD_PIN INT8_C(14)  // GPIO14 -> D5
-#define LED_BAD_PIN INT8_C(12)   // GPIO12 -> D6
-#define LED_STATE_PIN INT8_C(13) // GPIO13 -> D7
-#define BUTTON_PIN INT8_C(15)    // GPIO15 -> D8
+#define LED_GOOD_PIN INT8_C(12) // GPIO12 -> D6
+#define LED_BAD_PIN INT8_C(13)  // GPIO13 -> D7
+#define BUTTON_PIN INT8_C(15)   // GPIO15 -> D8
 
 /**********************************************************************************************************************/
 /* local variables */
 /**********************************************************************************************************************/
 
-/* LED status */
-#define LED_OFF INT8_C(-1)
-#define LED_ON INT8_C(0)
-#define LED_BLINK_SLOW INT8_C(1)
-#define LED_BLINK_FAST INT8_C(2)
+/* status */
+#define STATE_UNDEFINED INT8_C(-1)
+#define STATE_GOOD INT8_C(1)
+#define STATE_BAD INT8_C(2)
+#define STATE_RAMPUP INT8_C(9)
 
-int8_t led_good_status = LED_OFF;
-int8_t led_bad_status = LED_OFF;
-int8_t led_state_status = LED_BLINK_SLOW;
+int8_t state = STATE_RAMPUP;
 
 /* push button status */
 #define BUTTON_UP INT8_C(-1)
@@ -111,8 +108,6 @@ int8_t push_button_status = BUTTON_UP;
 #define IAQ_ACCURACY_OK INT8_C(1)
 #define IAQ_ACCURACY_IN_CALIBRATION INT8_C(2)
 #define IAQ_ACCURACY_CALIBRATED INT8_C(3)
-
-int8_t last_iaq_accuracy = IAQ_ACCURACY_INIT;
 
 /* Timestamp variables */
 /* get the timestamp in nanoseconds before calling bsec_sensor_control() */
@@ -134,16 +129,16 @@ int64_t time_stamp = 0;
  */
 int8_t bus_write(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data_ptr, uint16_t data_len)
 {
-  Wire.beginTransmission(dev_addr);
-  Wire.write(reg_addr); /* Set register address to start writing to */
+    Wire.beginTransmission(dev_addr);
+    Wire.write(reg_addr); /* Set register address to start writing to */
 
-  /* Write the data */
-  for (int index = 0; index < data_len; index++)
-  {
-    Wire.write(reg_data_ptr[index]);
-  }
+    /* Write the data */
+    for (int index = 0; index < data_len; index++)
+    {
+        Wire.write(reg_data_ptr[index]);
+    }
 
-  return (int8_t)Wire.endTransmission();
+    return (int8_t)Wire.endTransmission();
 }
 
 /*!
@@ -158,22 +153,22 @@ int8_t bus_write(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data_ptr, uint
  */
 int8_t bus_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data_ptr, uint16_t data_len)
 {
-  int8_t comResult = 0;
-  Wire.beginTransmission(dev_addr);
-  Wire.write(reg_addr); /* Set register address to start reading from */
-  comResult = Wire.endTransmission();
+    int8_t comResult = 0;
+    Wire.beginTransmission(dev_addr);
+    Wire.write(reg_addr); /* Set register address to start reading from */
+    comResult = Wire.endTransmission();
 
-  delayMicroseconds(150);                        /* Precautionary response delay */
-  Wire.requestFrom(dev_addr, (uint8_t)data_len); /* Request data */
+    delayMicroseconds(150);                        /* Precautionary response delay */
+    Wire.requestFrom(dev_addr, (uint8_t)data_len); /* Request data */
 
-  int index = 0;
-  while (Wire.available()) /* The slave device may send less than requested (burst read) */
-  {
-    reg_data_ptr[index] = Wire.read();
-    index++;
-  }
+    int index = 0;
+    while (Wire.available()) /* The slave device may send less than requested (burst read) */
+    {
+        reg_data_ptr[index] = Wire.read();
+        index++;
+    }
 
-  return comResult;
+    return comResult;
 }
 
 /*!
@@ -185,7 +180,7 @@ int8_t bus_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data_ptr, uint1
  */
 void sleep(uint32_t t_ms)
 {
-  delay(t_ms);
+    delay(t_ms);
 }
 
 /*!
@@ -195,7 +190,7 @@ void sleep(uint32_t t_ms)
  */
 int64_t get_timestamp_us()
 {
-  return (int64_t)millis() * 1000;
+    return (int64_t)millis() * 1000;
 }
 
 /*!
@@ -208,13 +203,13 @@ int64_t get_timestamp_us()
  */
 uint32_t state_load(uint8_t *state_buffer, uint32_t n_buffer)
 {
-  // ...
-  // Load a previous library state from non-volatile memory, if available.
-  //
-  // Return zero if loading was unsuccessful or no state was available,
-  // otherwise return length of loaded state string.
-  // ...
-  return 0;
+    // ...
+    // Load a previous library state from non-volatile memory, if available.
+    //
+    // Return zero if loading was unsuccessful or no state was available,
+    // otherwise return length of loaded state string.
+    // ...
+    return 0;
 }
 
 /*!
@@ -227,9 +222,9 @@ uint32_t state_load(uint8_t *state_buffer, uint32_t n_buffer)
  */
 void state_save(const uint8_t *state_buffer, uint32_t length)
 {
-  // ...
-  // Save the string some form of non-volatile memory, if possible.
-  // ...
+    // ...
+    // Save the string some form of non-volatile memory, if possible.
+    // ...
 }
 
 /*!
@@ -242,13 +237,13 @@ void state_save(const uint8_t *state_buffer, uint32_t length)
  */
 uint32_t config_load(uint8_t *config_buffer, uint32_t n_buffer)
 {
-  // ...
-  // Load a library config from non-volatile memory, if available.
-  //
-  // Return zero if loading was unsuccessful or no config was available,
-  // otherwise return length of loaded config string.
-  // ...
-  return 0;
+    // ...
+    // Load a library config from non-volatile memory, if available.
+    //
+    // Return zero if loading was unsuccessful or no config was available,
+    // otherwise return length of loaded config string.
+    // ...
+    return 0;
 }
 
 /*!
@@ -259,41 +254,40 @@ uint32_t config_load(uint8_t *config_buffer, uint32_t n_buffer)
  */
 void setup()
 {
-  return_values_init ret;
+    return_values_init ret;
 
-  /* Init the PED Pins */
-  pinMode(LED_GOOD_PIN, OUTPUT);
-  pinMode(LED_BAD_PIN, OUTPUT);
-  pinMode(LED_STATE_PIN, OUTPUT);
+    /* Init the PED Pins */
+    pinMode(LED_GOOD_PIN, OUTPUT);
+    pinMode(LED_BAD_PIN, OUTPUT);
 
-  /* Init Button Pin */
-  pinMode(BUTTON_PIN, INPUT);
+    /* Init Button Pin */
+    pinMode(BUTTON_PIN, INPUT);
 
-  /* Init I2C and serial communication */
-  Wire.begin(0, 2);
-  Serial.begin(115200);
+    /* Init I2C and serial communication */
+    Wire.begin(0, 2);
+    Serial.begin(115200);
 
-  /* Call to the function which initializes the BSEC library 
+    /* Call to the function which initializes the BSEC library 
      * Switch on low-power mode and provide no temperature offset */
-  ret = bsec_iot_init(BSEC_SAMPLE_RATE_LP, 0.0f, bus_write, bus_read, sleep, state_load, config_load);
-  if (ret.bme680_status)
-  {
-    /* Could not intialize BME680 */
-    Serial.println("Error while initializing BME680");
-    return;
-  }
-  else if (ret.bsec_status)
-  {
-    /* Could not intialize BSEC library */
-    Serial.println("Error while initializing BSEC library");
-    return;
-  }
+    ret = bsec_iot_init(BSEC_SAMPLE_RATE_LP, 0.0f, bus_write, bus_read, sleep, state_load, config_load);
+    if (ret.bme680_status)
+    {
+        /* Could not intialize BME680 */
+        Serial.println("Error while initializing BME680");
+        return;
+    }
+    else if (ret.bsec_status)
+    {
+        /* Could not intialize BSEC library */
+        Serial.println("Error while initializing BSEC library");
+        return;
+    }
 
-  time_stamp = get_timestamp_us() * 1000;
+    time_stamp = get_timestamp_us() * 1000;
 
-  /* Call to endless loop function which reads and processes data based on sensor settings */
-  /* State is saved every 10.000 samples, which means every 10.000 * 3 secs = 500 minutes  */
-  bsec_iot_loop(sleep, get_timestamp_us, output_ready, state_save, button_state, 10000);
+    /* Call to endless loop function which reads and processes data based on sensor settings */
+    /* State is saved every 10.000 samples, which means every 10.000 * 3 secs = 500 minutes  */
+    bsec_iot_loop(sleep, get_timestamp_us, output_ready, state_save, button_state, 10000);
 }
 
 /*!
@@ -303,12 +297,12 @@ void setup()
  */
 int8_t button_state()
 {
-  return digitalRead(BUTTON_PIN); // read the pushButton State
+    return digitalRead(BUTTON_PIN); // read the pushButton State
 }
 
 void loop()
 {
-  // nothing to do; all magic happens in bsec_iot_loop which calls back to output_ready(...)
+    // nothing to do; all magic happens in bsec_iot_loop which calls back to output_ready(...)
 }
 
 /* ========================================================================== */
@@ -317,62 +311,73 @@ void loop()
 
 void handle_led()
 {
-  /* --------------- LED-GOOD -------------------- */
-  if (led_good_status == LED_OFF)
-  {
-    // switch off LED_GOOD
-    digitalWrite(LED_GOOD_PIN, LOW);
-  }
-  else if (led_good_status == LED_OFF)
-  {
-    // switch on LED_GOOD
-    digitalWrite(LED_GOOD_PIN, HIGH);
-  }
-  /* ----------------- LED-BAD -------------------- */
-  if (led_bad_status == LED_OFF)
-  {
-    // switch off BAD
-    digitalWrite(LED_BAD_PIN, LOW);
-  }
-  else if (led_bad_status == LED_ON)
-  {
-    // switch on BAD
-    digitalWrite(LED_BAD_PIN, HIGH);
-  }
-  /* ---------------- LED_STATE ------------------- */
-  if (led_state_status == LED_OFF)
-  {
-    // switch off STATE
-    digitalWrite(LED_STATE_PIN, LOW);
-  }
-  else if (led_state_status == LED_OFF)
-  {
-    // switch on STATE
-    digitalWrite(LED_STATE_PIN, HIGH);
-  }
-  else if (led_state_status == LED_BLINK_SLOW)
-  {
-    // blink slow STATE
-    digitalWrite(LED_STATE_PIN, HIGH);
-    delay(500);
-    digitalWrite(LED_STATE_PIN, LOW);
-  }
-  else if (led_state_status == LED_BLINK_FAST)
-  {
-    // blink fast STATE
-    digitalWrite(LED_STATE_PIN, HIGH);
-    delay(100);
-    digitalWrite(LED_STATE_PIN, LOW);
-  }
-  /* ----------------------------------------------- */
+    String strState = "unknwon";
+    /* --------------- STATE_UNDEFINED -------------------- */
+    if (state == STATE_UNDEFINED)
+    {
+        strState = "  -> undefined";
+        // blink fast STATE
+        digitalWrite(LED_GOOD_PIN, HIGH);
+        digitalWrite(LED_BAD_PIN, LOW);
+        delay(150);
+        digitalWrite(LED_GOOD_PIN, LOW);
+        digitalWrite(LED_BAD_PIN, HIGH);
+        delay(150);
+        digitalWrite(LED_GOOD_PIN, HIGH);
+        digitalWrite(LED_BAD_PIN, LOW);
+        delay(150);
+        digitalWrite(LED_GOOD_PIN, LOW);
+        digitalWrite(LED_BAD_PIN, HIGH);
+        delay(50);
+        digitalWrite(LED_GOOD_PIN, LOW);
+        digitalWrite(LED_BAD_PIN, LOW);
+    }
+    /* --------------- RAMPUP -------------------- */
+    if (state == STATE_RAMPUP)
+    {
+        strState = "  -> blink";
+        // blink fast STATE
+        digitalWrite(LED_GOOD_PIN, HIGH);
+        digitalWrite(LED_BAD_PIN, HIGH);
+        delay(50);
+        digitalWrite(LED_GOOD_PIN, LOW);
+        digitalWrite(LED_BAD_PIN, LOW);
+        delay(50);
+        digitalWrite(LED_GOOD_PIN, HIGH);
+        digitalWrite(LED_BAD_PIN, HIGH);
+        delay(50);
+        digitalWrite(LED_GOOD_PIN, LOW);
+        digitalWrite(LED_BAD_PIN, LOW);
+    }
+    /* ----------------- GOOD -------------------- */
+    else if (state == STATE_GOOD)
+    {
+        strState = "  -> LED_GOOD on, LED_BAD off";
+        // switch on LED_GOOD and switch off LED_BAD
+        digitalWrite(LED_GOOD_PIN, HIGH);
+        digitalWrite(LED_BAD_PIN, LOW);
+    }
+    /* ---------------- BAD ------------------- */
+    else if (state == STATE_BAD)
+    {
+        strState = "  -> LED_GOOD off, LED_BAD on";
+        // switch off LED_GOOD and switch on LED_BAD
+        digitalWrite(LED_GOOD_PIN, LOW);
+        digitalWrite(LED_BAD_PIN, HIGH);
+    }
+    /* ---- SOMETHING MUST HAVE GONE WRONG ---- */
+    else{
+        strState = "  -> ?????";
+        // switch off LED_GOOD and switch on LED_BAD
+        digitalWrite(LED_GOOD_PIN, HIGH);
+        digitalWrite(LED_BAD_PIN, HIGH);
+    } 
 
-  Serial.print("LED_BAD: ");
-  Serial.print(led_bad_status);
-  Serial.print(", LED_GOOD: ");
-  Serial.print(led_good_status);
-  Serial.print(", LED_STATE: ");
-  Serial.print(led_state_status);
-  Serial.println();
+    Serial.print(strState);
+    Serial.print(" (state=");
+    Serial.print(state);
+    Serial.print(")");
+    Serial.println();
 }
 
 /*!
@@ -394,68 +399,33 @@ void handle_led()
 void output_ready(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temperature, float humidity,
                   float pressure, float raw_temperature, float raw_humidity, float gas, int8_t button_state, bsec_library_return_t bsec_status)
 {
-  Serial.print("iaq=");
-  Serial.print(iaq);
-  Serial.print(", iaq_accuracy=");
-  Serial.print(iaq_accuracy);
-  Serial.print(", bsec_status=");
-  Serial.print(bsec_status);
-  Serial.print(", button_state=");
-  Serial.print(button_state);
-  Serial.print(" -> ");
-  if (iaq_accuracy != IAQ_ACCURACY_INIT && bsec_status == BSEC_OK)
-  {
-    /* status switch from 0 to 1/2/3 -> switch off blinking */
-    if (last_iaq_accuracy == 0 && iaq_accuracy != last_iaq_accuracy)
-    {
-      led_state_status = LED_OFF;
-    }
-
-    /* ... */
-    if (iaq <= 150) // trigger level:
-    {
-      led_bad_status = LED_OFF;
-      led_good_status = LED_ON;
-    }
-    else
-    {
-      led_bad_status = LED_ON;
-      led_good_status = LED_OFF;
-    }
-  }
-  else if (iaq_accuracy == IAQ_ACCURACY_INIT) /* ramp up phase*/
-  {
-    led_state_status = LED_BLINK_SLOW;
-  }
-
-  /* switch on/off LEDs */
-  handle_led();
-
-  /* store last iaq_qccuracy */
-  last_iaq_accuracy = iaq_accuracy;
-
-  /*
-    Serial.print(timestamp / 1e6);
-    Serial.print(" - iaq: ");
+    Serial.print("iaq=");
     Serial.print(iaq);
-    Serial.print(" - iaq_accuracy: ");
+    Serial.print(", iaq_accuracy=");
     Serial.print(iaq_accuracy);
-    Serial.print(" - temperature: ");
-    Serial.print(temperature);
-    Serial.print(" - humidity: ");
-    Serial.print(humidity);
-    Serial.print(" - pressure: ");
-    Serial.print(pressure);
-    Serial.print(" - raw_temperature: ");
-    Serial.print(raw_temperature);
-    Serial.print(" - raw_humidity: ");
-    Serial.print(raw_humidity);
-    Serial.print(" - gas: ");
-    Serial.print(gas);
-    Serial.print(" - bsec_status: ");
+    Serial.print(", bsec_status=");
     Serial.print(bsec_status);
-    Serial.println();
-    */
+    Serial.print(", button_state=");
+    Serial.print(button_state);
+
+    if (bsec_status == BSEC_OK)
+    {
+        /* status switch from 0 to 1/2/3 -> switch off blinking */
+        if (iaq_accuracy == IAQ_ACCURACY_INIT)
+        {
+            state = STATE_RAMPUP;
+        }
+        else
+        {
+            state = ((iaq <= 150) ? STATE_GOOD : STATE_BAD);
+        }
+    }
+    else {
+        state = STATE_UNDEFINED;
+    }
+
+    /* switch on/off LEDs */
+    handle_led();
 }
 
 /*! @}*/
