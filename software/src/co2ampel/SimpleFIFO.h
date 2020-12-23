@@ -1,5 +1,6 @@
 /*
-||
+|| Original from:
+|| 
 || @file 		SimpleFIFO.h
 || @version 	1.2
 || @author 	Alexander Brevig
@@ -39,6 +40,8 @@ public:
 	bool enqueue( T element );	//add an element
 	T peek() const;				//get the next element without releasing it from the FIFO
 	void flush();				//[1.1] reset to default state 
+	T push(T element);          //add an element and remove the oldes if necessary; returns the removed element
+
 
 	//how many elements are currently in the FIFO?
 	int count() { return numberOfElements; }
@@ -68,6 +71,16 @@ T SimpleFIFO<T,rawSize>::dequeue() {
 	numberOfElements--;
 	nextOut %= size;
 	return raw[ nextOut++];
+}
+template<typename T, int rawSize>
+T IAQFifo<rawSize>::push(T element)
+{
+    T elem;
+    if (count() >= rawSize) {
+        elem = this->dequeue();
+    }
+    this->enqueue(element);
+    return elem;
 }
 template<typename T, int rawSize>
 T SimpleFIFO<T,rawSize>::peek() const {

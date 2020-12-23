@@ -77,6 +77,7 @@
 
 #include "bsec_integration.h"
 #include <Wire.h>
+#include "IAQFifo.h"
 
 /**********************************************************************************************************************/
 /* Hardware Pins */
@@ -105,6 +106,9 @@ int8_t state = STATE_RAMPUP;
 /* Timestamp variables */
 /* get the timestamp in nanoseconds before calling bsec_sensor_control() */
 int64_t time_stamp = 0;
+
+/* Init Ring Buffer */
+IAQFifo<10> iaqFifo; //store 10 floats
 
 /**********************************************************************************************************************/
 /* functions */
@@ -257,10 +261,6 @@ void setup()
     Wire.begin(0, 2);
     Serial.begin(115200);
 
-    /* Init Ring Buffer */
-    SimpleFIFO<int,10> fifo; //store 10 ints
-
-
     /* Call to the function which initializes the BSEC library 
      * Switch on low-power mode and provide no temperature offset */
     ret = bsec_iot_init(BSEC_SAMPLE_RATE_LP, 0.0f, bus_write, bus_read, sleep, state_load, config_load);
@@ -350,12 +350,13 @@ void handle_led()
         digitalWrite(LED_BAD_PIN, HIGH);
     }
     /* ---- SOMETHING MUST HAVE GONE WRONG ---- */
-    else{
+    else
+    {
         strState = "  -> ?????";
         // switch off LED_GOOD and switch on LED_BAD
         digitalWrite(LED_GOOD_PIN, HIGH);
         digitalWrite(LED_BAD_PIN, HIGH);
-    } 
+    }
 
     Serial.print(strState);
     Serial.print(" (state=");
@@ -383,10 +384,10 @@ void handle_led()
 void output_ready(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temperature, float humidity,
                   float pressure, float raw_temperature, float raw_humidity, float gas, bsec_library_return_t bsec_status)
 {
-    Serial.print("iaq=");
-    Serial.print(iaq);
-    Serial.print(", iaq_accuracy=");
+    Serial.print("iaq_accuracy=");
     Serial.print(iaq_accuracy);
+    Serial.print(", iaq=");
+    Serial.print(iaq);
     Serial.print(", bsec_status=");
     Serial.print(bsec_status);
 
@@ -399,12 +400,26 @@ void output_ready(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temp
         }
         else
         {
-            state = ((iaq <= 150) ? STATE_GOOD : STATE_BAD);
+            /* store iaq value to IAQ Fifo */
+            iaqFifo.push(iaq);
+            float iaq_avg = iaqFifo.average();
+
+            if (iaq_avg < 0)
+            {
+                state = STATE_RAMPUP;
+            }
+            else
+            {
+                state = ((iaq_avg <= 150) ? STATE_GOOD : STATE_BAD);
+            }
         }
     }
-    else {
+    else
+    {
         state = STATE_UNDEFINED;
     }
+    Serial.print(", smoothed_iaq=");
+    Serial.print(iaqFifo.average());
 
     /* switch on/off LEDs */
     handle_led();
