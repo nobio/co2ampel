@@ -78,7 +78,7 @@
 #include "bsec_integration.h"
 #include "IAQFifo.h"
 #include <Wire.h>
-#include <WiFi.h>
+#include <ESP8266WiFi.h>
 
 /**********************************************************************************************************************/
 /* Hardware Pins */
@@ -110,6 +110,10 @@ int8_t state = STATE_RAMPUP;
 
 /* Init Ring Buffer */
 IAQFifo<10> iaqFifo; //store 10 floats
+
+/* Wifi SSID and Password */
+const String WLAN_SSID = "WLAN Kabel";
+const String WLAN_PASSWD = "57002120109202250682";
 
 /**********************************************************************************************************************/
 /* functions */
@@ -279,8 +283,8 @@ void setup()
     }
 
     scanNetworks();
+    connectWifi();
 
-    
     /* Call to endless loop function which reads and processes data based on sensor settings */
     /* State is saved every 10.000 samples, which means every 10.000 * 3 secs = 500 minutes  */
     bsec_iot_loop(sleep, get_timestamp_us, output_ready, state_save, 10000);
@@ -383,6 +387,28 @@ void scanNetworks()
         Serial.print(") Network: ");
         Serial.println(WiFi.SSID(thisNet));
     }
+}
+
+void connectWifi()
+{
+
+    WiFi.begin(WLAN_SSID, WLAN_PASSWD); // Connect to the network
+    Serial.print("Connecting to ");
+    Serial.print(WLAN_SSID);
+    Serial.println(" ...");
+
+    int i = 0;
+    while (WiFi.status() != WL_CONNECTED)
+    { // Wait for the Wi-Fi to connect
+        delay(1000);
+        Serial.print(++i);
+        Serial.print(' ');
+    }
+
+    Serial.println('\n');
+    Serial.println("Connection established!");
+    Serial.print("IP address:\t");
+    Serial.println(WiFi.localIP()); // Send the IP address of the ESP8266 to the computer
 }
 
 /* ========================================================================== */
