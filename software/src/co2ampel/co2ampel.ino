@@ -257,6 +257,10 @@ void setup()
     Wire.begin(0, 2);
     Serial.begin(115200);
 
+    /* Init Ring Buffer */
+    SimpleFIFO<int,10> fifo; //store 10 ints
+
+
     /* Call to the function which initializes the BSEC library 
      * Switch on low-power mode and provide no temperature offset */
     ret = bsec_iot_init(BSEC_SAMPLE_RATE_LP, 0.0f, bus_write, bus_read, sleep, state_load, config_load);
