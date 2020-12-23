@@ -91,9 +91,13 @@
 
 /* status */
 #define STATE_UNDEFINED INT8_C(-1)
+#define STATE_RAMPUP INT8_C(0)
 #define STATE_GOOD INT8_C(1)
-#define STATE_BAD INT8_C(2)
-#define STATE_RAMPUP INT8_C(9)
+#define STATE_OK INT8_C(2)
+#define STATE_SOLALA INT8_C(3)
+#define STATE_BAD INT8_C(4)
+#define STATE_REALLYBAD INT8_C(5)
+#define STATE_SUPERBAD INT8_C(6)
 
 int8_t state = STATE_RAMPUP;
 
@@ -334,7 +338,7 @@ void handle_led()
         digitalWrite(LED_BAD_PIN, LOW);
     }
     /* ----------------- GOOD -------------------- */
-    else if (state == STATE_GOOD)
+    else if (state == STATE_GOOD || state == STATE_OK || state == STATE_SOLALA)
     {
         strState = "  -> LED_GOOD on, LED_BAD off";
         // switch on LED_GOOD and switch off LED_BAD
@@ -342,7 +346,7 @@ void handle_led()
         digitalWrite(LED_BAD_PIN, LOW);
     }
     /* ---------------- BAD ------------------- */
-    else if (state == STATE_BAD)
+    else if (state == STATE_BAD || state == STATE_REALLYBAD || state == STATE_SUPERBAD)
     {
         strState = "  -> LED_GOOD off, LED_BAD on";
         // switch off LED_GOOD and switch on LED_BAD
@@ -408,9 +412,33 @@ void output_ready(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temp
             {
                 state = STATE_RAMPUP;
             }
+            else if (iaq_avg >= 0 && iaq_avg <= 50)
+            {
+                state = STATE_GOOD;
+            }
+            else if (iaq_avg > 50 && iaq_avg <= 100)
+            {
+                state = STATE_OK;
+            }
+            else if (iaq_avg > 100 && iaq_avg <= 150)
+            {
+                state = STATE_SOLALA;
+            }
+            else if (iaq_avg > 150 && iaq_avg <= 200)
+            {
+                state = STATE_BAD;
+            }
+            else if (iaq_avg > 200 && iaq_avg <= 300)
+            {
+                state = STATE_REALLYBAD;
+            }
+            else if (iaq_avg > 300 && iaq_avg <= 500)
+            {
+                state = STATE_SUPERBAD;
+            }
             else
             {
-                state = ((iaq_avg <= 150) ? STATE_GOOD : STATE_BAD);
+                state = STATE_UNDEFINED;
             }
         }
     }
