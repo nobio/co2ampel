@@ -112,23 +112,6 @@ int8_t state = STATE_RAMPUP;
 #define IAQ_ACCURACY_IN_CALIBRATION INT8_C(2)
 #define IAQ_ACCURACY_CALIBRATED INT8_C(3)
 
-/* data structure of measurement */
-typedef struct
-{
-    int64_t timestamp;
-    float iaq;
-    float iaqSmoothed;
-    uint8_t iaq_accuracy;
-    float temperature;
-    float humidity;
-    float pressure;
-    float gas;
-} bme680_measure_type;
-
-/* Init Ring Buffer */
-IAQFifo<10> iaqFifo; //store 10 floats
-SimpleFIFO<bme680_measure_type, 50> valuesBuffer;
-
 /* Wifi SSID and Password */
 const String WLAN_SSID = "WLAN Kabel";
 const String WLAN_PASSWD = "57002120109202250682";
@@ -229,8 +212,6 @@ uint32_t state_load(uint8_t *state_buffer, uint32_t n_buffer)
     // Return zero if loading was unsuccessful or no state was available,
     // otherwise return length of loaded state string.
     // ...
-    Serial.print("loading state");
-
     return 0;
 }
 
@@ -247,7 +228,6 @@ void state_save(const uint8_t *state_buffer, uint32_t length)
     // ...
     // Save the string some form of non-volatile memory, if possible.
     // ...
-    Serial.print("saving state");
 }
 
 /*!
@@ -266,7 +246,6 @@ uint32_t config_load(uint8_t *config_buffer, uint32_t n_buffer)
     // Return zero if loading was unsuccessful or no config was available,
     // otherwise return length of loaded config string.
     // ...
-    Serial.print("loading config");
     return 0;
 }
 
@@ -304,8 +283,8 @@ void setup()
         return;
     }
 
-    scanNetworks();
-    connectWifi();
+    //scanNetworks();
+    //connectWifi();
 
     /* Call to endless loop function which reads and processes data based on sensor settings */
     /* State is saved every 10.000 samples, which means every 10.000 * 3 secs = 500 minutes  */
@@ -433,8 +412,10 @@ void connectWifi()
     Serial.println(WiFi.localIP()); // Send the IP address of the ESP8266 to the computer
 }
 
-void sendData(int64_t timestamp, float iaq, float iaqSmoothed, uint8_t iaq_accuracy, float temperature, float humidity, float pressure, float gas)
+void sendData(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temperature, float humidity, float pressure)
 {
+    Serial.print(iaq);
+    /*
     // try to reconnect three times if not connected
     for (int n = 0; n < 3 && WiFi.status() != WL_CONNECTED; n++)
     {
@@ -454,16 +435,12 @@ void sendData(int64_t timestamp, float iaq, float iaqSmoothed, uint8_t iaq_accur
         body += iaq_accuracy;
         body += F("\",\"iaq\":\"");
         body += String(iaq, 2);
-        body += F("\",\"iaqSmoothed\":\"");
-        body += String(iaqSmoothed, 2);
         body += F("\",\"temperature\":\"");
         body += String(temperature, 2);
         body += F("\",\"humidity\":\"");
         body += String(humidity, 2);
         body += F("\",\"pressure\":\"");
         body += String(pressure, 2);
-        body += F("\",\"gas\":\"");
-        body += String(gas, 2);
         body += F("\"}");
 
         int httpResponseCode = http.POST(body);
@@ -476,6 +453,7 @@ void sendData(int64_t timestamp, float iaq, float iaqSmoothed, uint8_t iaq_accur
     {
         Serial.println("Error in WiFi connection");
     }
+    */
 }
 
 /* ========================================================================== */
@@ -517,35 +495,31 @@ void output_ready(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temp
         }
         else
         {
-            /* store iaq value to IAQ Fifo */
-            iaqFifo.push(iaq);
-            float iaq_avg = iaqFifo.average();
-
-            if (iaq_avg < 0)
+            if (iaq < 0)
             {
                 state = STATE_RAMPUP;
             }
-            else if (iaq_avg >= 0 && iaq_avg <= 50)
+            else if (iaq >= 0 && iaq <= 50)
             {
                 state = STATE_GOOD;
             }
-            else if (iaq_avg > 50 && iaq_avg <= 100)
+            else if (iaq > 50 && iaq <= 100)
             {
                 state = STATE_OK;
             }
-            else if (iaq_avg > 100 && iaq_avg <= 150)
+            else if (iaq > 100 && iaq <= 150)
             {
                 state = STATE_SOLALA;
             }
-            else if (iaq_avg > 150 && iaq_avg <= 200)
+            else if (iaq > 150 && iaq <= 200)
             {
                 state = STATE_BAD;
             }
-            else if (iaq_avg > 200 && iaq_avg <= 300)
+            else if (iaq > 200 && iaq <= 300)
             {
                 state = STATE_REALLYBAD;
             }
-            else if (iaq_avg > 300 && iaq_avg <= 500)
+            else if (iaq > 300 && iaq <= 500)
             {
                 state = STATE_SUPERBAD;
             }
@@ -559,11 +533,8 @@ void output_ready(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temp
     {
         state = STATE_UNDEFINED;
     }
-    Serial.print(", smoothed_iaq=");
-    Serial.print(iaqFifo.average());
-
     /* send the data to a server or file or where ever */
-    sendData(timestamp, iaq, iaqFifo.average(), iaq_accuracy, temperature, humidity, pressure, gas);
+    sendData(timestamp, iaq, iaq_accuracy, temperature, humidity, pressure);
 
     /* switch on/off LEDs */
     handle_led();

@@ -29,19 +29,21 @@
 || #
 ||
 */
-template<typename T, int rawSize>
-class SimpleFIFO {
+template <typename T, int rawSize>
+class SimpleFIFO
+{
 public:
-	const int size;				//speculative feature, in case it's needed
+	const int size; //speculative feature, in case it's needed
 
 	SimpleFIFO();
 
-	T dequeue();				//get next element
-	bool enqueue( T element );	//add an element
-	T peek() const;				//get the next element without releasing it from the FIFO
-	void flush();				//[1.1] reset to default state 
-	T push(T element);          //add an element and remove the oldes if necessary; returns the removed element
-
+	T dequeue();			 //get next element
+	bool enqueue(T element); //add an element
+	T peek() const;			 //get the next element without releasing it from the FIFO
+	void flush();			 //[1.1] reset to default state
+	T push(T element);		 //add an element and remove the oldes if necessary; returns the removed element
+	bool isFull();			 // check if the buffer is full
+	bool isEmpty();			 // check if the buffer is empty
 
 	//how many elements are currently in the FIFO?
 	int count() { return numberOfElements; }
@@ -53,39 +55,59 @@ private:
 	T raw[rawSize];
 };
 
-template<typename T, int rawSize>
-SimpleFIFO<T,rawSize>::SimpleFIFO() : size(rawSize) {
+template <typename T, int rawSize>
+SimpleFIFO<T, rawSize>::SimpleFIFO() : size(rawSize)
+{
 	flush();
 }
-template<typename T, int rawSize>
-bool SimpleFIFO<T,rawSize>::enqueue( T element ) {
-	if ( count() >= rawSize ) { return false; }
+template <typename T, int rawSize>
+bool SimpleFIFO<T, rawSize>::enqueue(T element)
+{
+	if (count() >= rawSize)
+	{
+		return false;
+	}
 	numberOfElements++;
 	nextIn %= size;
 	raw[nextIn] = element;
 	nextIn++; //advance to next index
 	return true;
 }
-template<typename T, int rawSize>
-T SimpleFIFO<T,rawSize>::dequeue() {
+template <typename T, int rawSize>
+T SimpleFIFO<T, rawSize>::dequeue()
+{
 	numberOfElements--;
 	nextOut %= size;
-	return raw[ nextOut++];
+	return raw[nextOut++];
 }
-template<typename T, int rawSize>
-T SimpleFIFO<T,rawSize>::push(T element) {
-    T elem;
-    if (count() >= rawSize) {
-        elem = this->dequeue();
-    }
-    this->enqueue(element);
-    return elem;
+template <typename T, int rawSize>
+T SimpleFIFO<T, rawSize>::push(T element)
+{
+	T elem;
+	if (isFull())
+	{
+		elem = this->dequeue();
+	}
+	this->enqueue(element);
+	return elem;
 }
-template<typename T, int rawSize>
-T SimpleFIFO<T,rawSize>::peek() const {
-	return raw[ nextOut % size];
+template <typename T, int rawSize>
+T SimpleFIFO<T, rawSize>::peek() const
+{
+	return raw[nextOut % size];
 }
-template<typename T, int rawSize>
-void SimpleFIFO<T,rawSize>::flush() {
+template <typename T, int rawSize>
+void SimpleFIFO<T, rawSize>::flush()
+{
 	nextIn = nextOut = numberOfElements = 0;
+}
+template <typename T, int rawSize>
+bool SimpleFIFO<T, rawSize>::isFull()
+{
+	return (count() >= rawSize);
+}
+template <typename T, int rawSize>
+bool SimpleFIFO<T, rawSize>::isEmpty()
+{
+	return (count() == 0);
 }
