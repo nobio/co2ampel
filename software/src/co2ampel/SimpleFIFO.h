@@ -73,8 +73,7 @@ T SimpleFIFO<T,rawSize>::dequeue() {
 	return raw[ nextOut++];
 }
 template<typename T, int rawSize>
-T IAQFifo<rawSize>::push(T element)
-{
+T SimpleFIFO<T,rawSize>::push(T element) {
     T elem;
     if (count() >= rawSize) {
         elem = this->dequeue();

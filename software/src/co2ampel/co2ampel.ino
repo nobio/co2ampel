@@ -77,9 +77,11 @@
 
 #include "bsec_integration.h"
 #include "IAQFifo.h"
+#include "SimpleFIFO.h"
 #include <Wire.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
+
 // #include <Arduino_JSON.h>
 
 /**********************************************************************************************************************/
@@ -110,8 +112,22 @@ int8_t state = STATE_RAMPUP;
 #define IAQ_ACCURACY_IN_CALIBRATION INT8_C(2)
 #define IAQ_ACCURACY_CALIBRATED INT8_C(3)
 
+/* data structure of measurement */
+typedef struct
+{
+    int64_t timestamp;
+    float iaq;
+    float iaqSmoothed;
+    uint8_t iaq_accuracy;
+    float temperature;
+    float humidity;
+    float pressure;
+    float gas;
+} bme680_measure_type;
+
 /* Init Ring Buffer */
 IAQFifo<10> iaqFifo; //store 10 floats
+SimpleFIFO<bme680_measure_type, 50> valuesBuffer;
 
 /* Wifi SSID and Password */
 const String WLAN_SSID = "WLAN Kabel";
@@ -213,6 +229,8 @@ uint32_t state_load(uint8_t *state_buffer, uint32_t n_buffer)
     // Return zero if loading was unsuccessful or no state was available,
     // otherwise return length of loaded state string.
     // ...
+    Serial.print("loading state");
+
     return 0;
 }
 
@@ -229,6 +247,7 @@ void state_save(const uint8_t *state_buffer, uint32_t length)
     // ...
     // Save the string some form of non-volatile memory, if possible.
     // ...
+    Serial.print("saving state");
 }
 
 /*!
@@ -247,6 +266,7 @@ uint32_t config_load(uint8_t *config_buffer, uint32_t n_buffer)
     // Return zero if loading was unsuccessful or no config was available,
     // otherwise return length of loaded config string.
     // ...
+    Serial.print("loading config");
     return 0;
 }
 
@@ -404,7 +424,7 @@ void connectWifi()
     { // Wait for the Wi-Fi to connect
         delay(1000);
         Serial.print(++i);
-        Serial.print(' ');
+        Serial.print("..");
     }
 
     Serial.println('\n');
@@ -424,7 +444,9 @@ void sendData(int64_t timestamp, float iaq, float iaqSmoothed, uint8_t iaq_accur
     if (WiFi.status() == WL_CONNECTED)
     {
         HTTPClient http;
-        http.begin("http://raspbox:1880/api/test");
+        WiFiClient client;
+        http.setReuse(true);
+        http.begin(client, "http://raspbox:1880/api/test");
         http.addHeader("Content-Type", "application/json");
 
         String body;
