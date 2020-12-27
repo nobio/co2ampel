@@ -23,6 +23,8 @@
 
 #include "bsec_integration.h"
 #include <Wire.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266WiFi.h>
 
 /**********************************************************************************************************************/
 /* Hardware Pins */
@@ -54,8 +56,8 @@ int8_t state = STATE_RAMPUP;
 #define IAQ_ACCURACY_CALIBRATED INT8_C(3)
 
 /* Wifi SSID and Password */
-const String WLAN_SSID = "WLAN Kabel";
-const String WLAN_PASSWD = "57002120109202250682";
+const char *WLAN_SSID = "WLAN Kabel";
+const char *WLAN_PASSWD = "57002120109202250682";
 
 /**********************************************************************************************************************/
 /* functions */
@@ -225,6 +227,9 @@ void setup()
         return;
     }
 
+    /* setup Wifi connection */
+    connectWifi();
+
     /* Call to endless loop function which reads and processes data based on sensor settings */
     /* State is saved every 10.000 samples, which means every 10.000 * 3 secs = 500 minutes  */
     bsec_iot_loop(sleep, get_timestamp_us, output_ready, state_save, 10000);
@@ -303,17 +308,96 @@ void handle_led()
         digitalWrite(LED_GOOD_PIN, HIGH);
         digitalWrite(LED_BAD_PIN, HIGH);
     }
+    Serial.println(strState);
+
     /*
     Serial.print(strState);
     Serial.print(" (state=");
     Serial.print(state);
     Serial.print(")");
     Serial.println();
-*/
+    */
 }
 
-void sendData(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temperature, float humidity, float pressure)
+/**
+ * connect to local wifi
+ */
+void connectWifi()
 {
+    // scan for nearby networks:
+    Serial.println("** Scan Networks **");
+    byte numSsid = WiFi.scanNetworks();
+    bool bNetworkFound = false;
+
+    // print the list of networks seen:
+    Serial.print("SSID List:");
+    Serial.println(numSsid);
+    // print the network number and name for each network found:
+    for (int thisNet = 0; thisNet < numSsid; thisNet++)
+    {
+        Serial.print(thisNet);
+        Serial.print(") Network: ");
+        Serial.println(WiFi.SSID(thisNet));
+        bNetworkFound |= (WiFi.SSID(thisNet) == WLAN_SSID);
+    }
+
+    /* do not connect to wifi if the ssid has not been found */
+    if (!bNetworkFound)
+    {
+        return;
+    }
+
+    WiFi.begin(WLAN_SSID, WLAN_PASSWD);
+    Serial.println();
+    Serial.print("connecting to wifi ");
+    Serial.print(WLAN_SSID);
+    Serial.print("...");
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println();
+
+    Serial.print("Connected, IP address: ");
+    Serial.println(WiFi.localIP());
+}
+
+void sendData(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temperature, float humidity, float pressure, float triggerValue)
+{
+    if (WiFi.status() == WL_CONNECTED) //Check WiFi connection status
+    {
+        String body;
+        body += F("iaq=");
+        body += String(iaq, 2);
+        body += F(";triggerValue=");
+        body += String(triggerValue, 2);
+        body += F(";temperature=");
+        body += String(temperature, 2);
+        body += F(";humidity=");
+        body += String(humidity, 2);
+        body += F(";pressure=");
+        body += String(pressure, 2);
+
+        HTTPClient http; //Declare object of class HTTPClient
+
+        http.begin("http://raspbox:1880/api/test");   //Specify request destination
+        http.addHeader("Content-Type", "text/plain"); //Specify content-type header
+
+        int httpResponseCode = http.POST(body);
+        http.end();
+        /*
+        Serial.print("; status code: ");
+        Serial.print(httpResponseCode);
+        Serial.println(httpCode); //Print HTTP return code
+        Serial.println(payload);  //Print request response payload
+*/
+        http.end(); //Close connection
+    }
+    else
+    {
+        Serial.println("Error in WiFi connection");
+    }
 }
 
 /* ========================================================================== */
@@ -394,7 +478,7 @@ void output_ready(int64_t timestamp, float iaq, uint8_t iaq_accuracy, float temp
         state = STATE_UNDEFINED;
     }
     /* send the data to a server or file or where ever */
-    sendData(timestamp, iaq, iaq_accuracy, temperature, humidity, pressure);
+    sendData(timestamp, iaq, iaq_accuracy, temperature, humidity, pressure, triggerValue);
 
     /* switch on/off LEDs */
     handle_led();
