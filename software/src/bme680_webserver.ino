@@ -5,8 +5,8 @@
 #include "ESPAsyncWebServer.h"
 
 // Replace with your network credentials
-const char* ssid = "REPLACE_WITH_YOUR_SSID";
-const char* password = "REPLACE_WITH_YOUR_PASSWORD";
+const char* ssid = "WLAN Kabel";
+const char* password = "57002120109202250682";
 
 //Uncomment if using SPI
 /*#define BME_SCK 14
