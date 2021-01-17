@@ -9,11 +9,11 @@
 Adafruit_BME680 bme; // I2C
  
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   while (!Serial);
   Serial.println(F("BME680 test"));
  
-  if (!bme.begin(0x76)) 
+  if (!bme.begin(0x77)) 
   {
     Serial.println("Could not find a valid BME680 sensor, check wiring!");
     while (1);
