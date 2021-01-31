@@ -206,7 +206,8 @@ void setup()
     pinMode(POTI_PIN, INPUT);
 
     /* Init I2C and serial communication */
-    Wire.begin(0, 2);
+    Wire.begin(0x77);
+    //Wire.begin(0, 2);
     Serial.begin(115200);
 
     /* Call to the function which initializes the BSEC library 
