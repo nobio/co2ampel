@@ -1,0 +1,1 @@
+https://github.com/BoschSensortec/BSEC-Arduino-library

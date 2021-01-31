@@ -17,10 +17,10 @@ Adafruit_BME680 bme; // I2C
 #define OLED_RESET 4
 Adafruit_SSD1306 display(OLED_RESET);
 
-float hum_score, gas_score;
-float gas_reference = 250000;
-float hum_reference = 40;
-int   getgasreference_count = 0;
+float g_humScore, g_gasScore;
+float g_gasReference = 250000;
+float g_humReference = 40;
+int   g_getgasreferenceCounter = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -81,12 +81,12 @@ void loop() {
 String getAirQuality() {
     float current_humidity = bme.readHumidity();
     if (current_humidity >= 38 && current_humidity <= 42) {
-        hum_score = 0.25 * 100; // Humidity +/-5% around optimum
+        g_humScore = 0.25 * 100; // Humidity +/-5% around optimum
     } else { //sub-optimal
         if (current_humidity < 38) {
-            hum_score = 0.25 / hum_reference * current_humidity * 100;
+            g_humScore = 0.25 / g_humReference * current_humidity * 100;
         } else {
-            hum_score = ((-0.25 / (100 - hum_reference) * current_humidity) + 0.416666) * 100;
+            g_humScore = ((-0.25 / (100 - g_humReference) * current_humidity) + 0.416666) * 100;
         }
     }
 
@@ -94,12 +94,12 @@ String getAirQuality() {
   float gas_lower_limit = 5000;   // Bad air quality limit
   float gas_upper_limit = 50000;  // Good air quality limit 
   
-  if (gas_reference > gas_upper_limit) gas_reference = gas_upper_limit; 
-  if (gas_reference < gas_lower_limit) gas_reference = gas_lower_limit;
+  if (g_gasReference > gas_upper_limit) g_gasReference = gas_upper_limit; 
+  if (g_gasReference < gas_lower_limit) g_gasReference = gas_lower_limit;
 
-  gas_score = (0.75 / (gas_upper_limit - gas_lower_limit) * gas_reference - (gas_lower_limit * (0.75 / (gas_upper_limit - gas_lower_limit)))) * 100;
-  float air_quality_score = hum_score + gas_score;
-  if ((getgasreference_count++)%10==0) GetGasReference(); 
+  g_gasScore = (0.75 / (gas_upper_limit - gas_lower_limit) * g_gasReference - (gas_lower_limit * (0.75 / (gas_upper_limit - gas_lower_limit)))) * 100;
+  float air_quality_score = g_humScore + g_gasScore;
+  if ((g_getgasreferenceCounter++)%10==0) GetGasReference(); 
   
   return CalculateIAQ(air_quality_score);
 }
@@ -107,9 +107,9 @@ String getAirQuality() {
 void GetGasReference(){
   int readings = 10;
   for (int i = 1; i <= readings; i++){
-    gas_reference += bme.readGas();
+    g_gasReference += bme.readGas();
   }
-  gas_reference = gas_reference / readings;
+  g_gasReference = g_gasReference / readings;
 }
 
 String CalculateIAQ(float score) {
