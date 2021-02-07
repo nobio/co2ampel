@@ -15,6 +15,7 @@ const int PIN_RGB_BLUE  = D7;
 // Helper functions declarations
 void checkIaqSensorStatus(void);
 void errLeds(void);
+void writeLog();
 
 // wifi & router functions
 void handleRoot(void);
@@ -22,6 +23,19 @@ void handleNotFound(void);
 void handleDataAsJson(void);
 void setupRoutes(void);
 void setupWifi(void);
+
+// Air Quality Values
+struct AIRQ {
+  float temperature;
+  float humidity;
+  float pressure;
+  float iaq;
+  int accuracy;
+  float co2;
+  float voc;
+};
+AIRQ airQuality = {0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0};
+
 // RGB-LEDs
 struct RGB {
   byte red;
@@ -31,21 +45,13 @@ struct RGB {
 
 void setLEDColor(RGB);
 void blinkLEDColor(RGB);
-RGB calculateIaqColor(float);
+void blinkLEDColor(RGB, int);
+RGB calculateIaqColor(AIRQ);
 
 // Create an object of the class Bsec
 Bsec iaqSensor;
 // Instance of Webserver
 ESP8266WebServer server(80);
-
-// variables to store state
-float temperature = 0.0;
-float humidity = 0.0;
-float pressure = 0.0;
-float iaq = 0.0;
-int iaqAccuracy = 0;
-float co2 = 0.0;
-float voc = 0.0;
 
 String output;
 
@@ -87,8 +93,11 @@ void setup(void)
   // setup RGB-LEDs
   Serial.println("setup RGB-LED");
   pinMode(PIN_RGB_RED,   OUTPUT);
+  pinMode(PIN_RGB_RED,   INPUT);
   pinMode(PIN_RGB_GREEN, OUTPUT);
+  pinMode(PIN_RGB_GREEN, INPUT);
   pinMode(PIN_RGB_BLUE,  OUTPUT);
+  pinMode(PIN_RGB_BLUE,  INPUT);
   setLEDColor(RGB{255,0,213});
 
   // Print the header
@@ -101,44 +110,50 @@ void loop(void)
 {
   unsigned long time_trigger = millis();
   if (iaqSensor.run()) { // If new data is available
-    output = "";
-//    output += String(time_trigger);
-    output += ", rTemp: " + String(iaqSensor.rawTemperature);
-    output += ", press: " + String(iaqSensor.pressure);
-    output += ", rHumi: " + String(iaqSensor.rawHumidity);
-    output += ", gasRe: " + String(iaqSensor.gasResistance);
-    output += ", iaq:   " + String(iaqSensor.iaq);
-    output += ", iaqAc: " + String(iaqSensor.iaqAccuracy);
-    output += ", temp:  " + String(iaqSensor.temperature);
-    output += ", humi:  " + String(iaqSensor.humidity);
-    output += ", stIaq: " + String(iaqSensor.staticIaq);
-    output += ", co2:   " + String(iaqSensor.co2Equivalent);
-    output += ", voc:   " + String(iaqSensor.breathVocEquivalent);
-    Serial.println(output);
-
     // store values
-    temperature = iaqSensor.rawTemperature;
-    humidity = iaqSensor.rawHumidity;
-    pressure = iaqSensor.pressure;
-    iaq = iaqSensor.iaq;
-    iaqAccuracy = iaqSensor.iaqAccuracy;
-    co2 = iaqSensor.co2Equivalent;
-    voc = iaqSensor.breathVocEquivalent;
+    airQuality.temperature = iaqSensor.temperature;
+    airQuality.humidity = iaqSensor.humidity;
+    airQuality.pressure = iaqSensor.pressure;
+    airQuality.iaq = iaqSensor.iaq;
+    airQuality.accuracy = iaqSensor.iaqAccuracy;
+    airQuality.co2 = iaqSensor.co2Equivalent;
+    airQuality.voc = iaqSensor.breathVocEquivalent;
+
+    // serial out log
+    writeLog();
 
     // do some webserver magic...
     server.handleClient();
     MDNS.update();
 
     // temporary Code
-    if(iaqAccuracy == 0) {
-      blinkLEDColor(RGB{255, 255, 255});
+    if(airQuality.accuracy == 0) {
+      blinkLEDColor(RGB{255, 255, 255}, 2);
     } else {
-      setLEDColor(calculateIaqColor(iaq));
+      setLEDColor(calculateIaqColor(airQuality));
     }
 
   } else {
     checkIaqSensorStatus();
   }
+}
+
+void writeLog() {
+    output = ">";
+//    output += String(time_trigger);
+    output += ", rTemp: " + String(airQuality.temperature);
+    output += ", press: " + String(airQuality.pressure);
+    output += ", rHumi: " + String(airQuality.humidity);
+    //output += ", gasRe: " + String(airQuality.gasResistance);
+    output += ", iaq:   " + String(airQuality.iaq);
+    output += ", iaqAc: " + String(airQuality.accuracy);
+    output += ", temp:  " + String(airQuality.temperature);
+    output += ", humi:  " + String(airQuality.humidity);
+    //output += ", stIaq: " + String(airQuality.staticIaq);
+    output += ", co2:   " + String(airQuality.co2);
+    output += ", voc:   " + String(airQuality.voc);
+    
+    Serial.println(output);
 }
 
 // Helper function definitions
@@ -177,13 +192,13 @@ void checkIaqSensorStatus(void)
   }
 }
 
-void errLeds(void)
-{
+void errLeds(void) {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
   delay(100);
   digitalWrite(LED_BUILTIN, LOW);
   delay(100);
+  blinkLEDColor(RGB{0, 0, 255});
 }
 
 // ---------------- Setup Wifi ----------------------------------
@@ -244,12 +259,13 @@ void handleDataAsJson() {
   digitalWrite(LED_BUILTIN, HIGH);
   JSONVar dataObj;
 
-  dataObj["temperature"] = roundf(temperature * 100.0) / 100.0;
-  dataObj["humidity"] = roundf(humidity * 100.0) / 100.0;
-  dataObj["pressure"] = roundf(pressure * 100.0) / 100.0;
-  dataObj["iaq"] = roundf(iaq * 100.0) / 100.0;
-  dataObj["iaqAccuracy"] = iaqAccuracy;
-  dataObj["co2"] = roundf(co2 * 100.0) / 100.0;
+  dataObj["temperature"] = roundf(airQuality.temperature * 100.0) / 100.0;
+  dataObj["humidity"] = roundf(airQuality.humidity * 100.0) / 100.0;
+  dataObj["pressure"] = roundf(airQuality.pressure * 100.0) / 100.0;
+  dataObj["iaq"] = roundf(airQuality.iaq * 100.0) / 100.0;
+  dataObj["iaqAccuracy"] = airQuality.accuracy;
+  dataObj["co2"] = roundf(airQuality.co2 * 100.0) / 100.0;
+  dataObj["voc"] = roundf(airQuality.voc * 100.0) / 100.0;
 
   Serial.print("response = ");
   Serial.println(dataObj);
@@ -273,21 +289,26 @@ void setLEDColor(RGB color) {
   analogWrite(PIN_RGB_BLUE,  color.blue);
 }
 
-void blinkLEDColor(RGB color) {
-  for(int n = 0; n <= 2; n++) {
-    analogWrite(PIN_RGB_RED,   0);
-    analogWrite(PIN_RGB_GREEN, 0);
-    analogWrite(PIN_RGB_BLUE,  0);
-    delay(200);
-
-    analogWrite(PIN_RGB_RED,   color.red);
-    analogWrite(PIN_RGB_GREEN, color.green);
-    analogWrite(PIN_RGB_BLUE,  color.blue);
-    delay(150);
+void blinkLEDColor(RGB color, int cycles) {
+  for(int n = 0; n < cycles; n++) {
+    blinkLEDColor(color);
   }
 }
 
-RGB calculateIaqColor(float iaq) {
+void blinkLEDColor(RGB color) {
+  analogWrite(PIN_RGB_RED,   0);
+  analogWrite(PIN_RGB_GREEN, 0);
+  analogWrite(PIN_RGB_BLUE,  0);
+  delay(200);
+
+  analogWrite(PIN_RGB_RED,   color.red);
+  analogWrite(PIN_RGB_GREEN, color.green);
+  analogWrite(PIN_RGB_BLUE,  color.blue);
+  delay(150);
+}
+
+RGB calculateIaqColor(AIRQ airQuality) {
+  float iaq = airQuality.iaq;
   RGB color = { 0, 0, 0 };
 
   if(iaq <= 50) {
@@ -296,11 +317,11 @@ RGB calculateIaqColor(float iaq) {
     color = { 255, 255, 0 };   // yellow -> average
   } else if(iaq <= 150) {
     color = { 255, 173, 51 };  // orange -> little bad
-  } else if(iaq <= 100) {
+  } else if(iaq <= 200) {
     color = { 255, 0, 0 };     // red  -> bad
-  } else if(iaq <= 100) {
+  } else if(iaq <= 300) {
     color = { 255, 0, 255 };   // purple -> worse
-  } else if(iaq <= 100) {
+  } else if(iaq <= 500) {
     color = { 0, 0, 255 };     // blue -> really bad
   }
 
