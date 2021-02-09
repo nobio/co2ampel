@@ -2,6 +2,7 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <Arduino_JSON.h>
+#include <U8g2lib.h>
 
 /* ----------------------WLAN Connect Daten -------------------------- */ 
 const char* ssid = "WLAN Kabel";
