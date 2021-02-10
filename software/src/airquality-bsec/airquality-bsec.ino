@@ -1,4 +1,5 @@
 #include "bsec.h"
+#include "Fifo.h"
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <Arduino_JSON.h>
@@ -25,17 +26,18 @@ void handleDataAsJson(void);
 void setupRoutes(void);
 void setupWifi(void);
 
-// Air Quality Values
+// Air Quality Value Structure
 struct AIRQ {
   float temperature;
   float humidity;
   float pressure;
   float iaq;
+  float iaqSmooth;
   int accuracy;
   float co2;
   float voc;
 };
-AIRQ airQuality = {0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0};
+AIRQ airQuality = {0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0, 0.0};
 
 // RGB-LEDs
 struct RGB {
@@ -55,6 +57,7 @@ Bsec iaqSensor;
 ESP8266WebServer server(80);
 
 String output;
+Fifo<float, 5> iaqFifo;
 
 // Entry point for the example
 void setup(void)
@@ -120,6 +123,14 @@ void loop(void)
     airQuality.co2 = iaqSensor.co2Equivalent;
     airQuality.voc = iaqSensor.breathVocEquivalent;
 
+    iaqFifo.enqueue(airQuality.iaq);
+
+    float iaqSum = 0.0;
+    for (int n = 0; n < iaqFifo.count(); n++) {
+      iaqSum += iaqFifo.peek();
+    }
+    airQuality.iaqSmooth = iaqSum/iaqFifo.count();
+
     // serial out log
     writeLog();
 
@@ -140,20 +151,20 @@ void loop(void)
 }
 
 void writeLog() {
-    output = ">";
+    output = "# ";
 //    output += String(time_trigger);
-    output += ", rTemp: " + String(airQuality.temperature);
-    output += ", press: " + String(airQuality.pressure);
-    output += ", rHumi: " + String(airQuality.humidity);
+    output += ", rTemp:" + String(airQuality.temperature);
+    output += ", press:" + String(airQuality.pressure);
+    output += ", rHumi:" + String(airQuality.humidity);
     //output += ", gasRe: " + String(airQuality.gasResistance);
-    output += ", iaq:   " + String(airQuality.iaq);
-    output += ", iaqAc: " + String(airQuality.accuracy);
-    output += ", temp:  " + String(airQuality.temperature);
-    output += ", humi:  " + String(airQuality.humidity);
+    output += ", iaq:" + String(airQuality.iaq);
+    output += ", iaqSmooth:" + String(airQuality.iaqSmooth);
+    output += ", iaqAc:" + String(airQuality.accuracy);
+    output += ", temp:" + String(airQuality.temperature);
+    output += ", humi:" + String(airQuality.humidity);
     //output += ", stIaq: " + String(airQuality.staticIaq);
-    output += ", co2:   " + String(airQuality.co2);
-    output += ", voc:   " + String(airQuality.voc);
-    
+    output += ", co2:" + String(airQuality.co2);
+    output += ", voc:" + String(airQuality.voc);
     Serial.println(output);
 }
 
@@ -264,6 +275,7 @@ void handleDataAsJson() {
   dataObj["humidity"] = roundf(airQuality.humidity * 100.0) / 100.0;
   dataObj["pressure"] = roundf(airQuality.pressure * 100.0) / 100.0;
   dataObj["iaq"] = roundf(airQuality.iaq * 100.0) / 100.0;
+  dataObj["iaqSmooth"] = roundf(airQuality.iaqSmooth * 100.0) / 100.0;
   dataObj["iaqAccuracy"] = airQuality.accuracy;
   dataObj["co2"] = roundf(airQuality.co2 * 100.0) / 100.0;
   dataObj["voc"] = roundf(airQuality.voc * 100.0) / 100.0;
