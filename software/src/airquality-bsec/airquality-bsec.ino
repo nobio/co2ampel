@@ -57,7 +57,7 @@ Bsec iaqSensor;
 ESP8266WebServer server(80);
 
 String output;
-Fifo<float, 5> iaqFifo;
+Fifo<float, 20> iaqFifo;
 
 // Entry point for the example
 void setup(void)
