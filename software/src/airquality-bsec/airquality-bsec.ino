@@ -1,5 +1,4 @@
 #include "bsec.h"
-#include "Fifo.h"
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <Arduino_JSON.h>
@@ -32,12 +31,11 @@ struct AIRQ {
   float humidity;
   float pressure;
   float iaq;
-  float iaqSmooth;
   int accuracy;
   float co2;
   float voc;
 };
-AIRQ airQuality = {0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0, 0.0};
+AIRQ airQuality = {0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0};
 
 // RGB-LEDs
 struct RGB {
@@ -57,7 +55,6 @@ Bsec iaqSensor;
 ESP8266WebServer server(80);
 
 String output;
-Fifo<float, 20> iaqFifo;
 
 // Entry point for the example
 void setup(void)
@@ -123,14 +120,6 @@ void loop(void)
     airQuality.co2 = iaqSensor.co2Equivalent;
     airQuality.voc = iaqSensor.breathVocEquivalent;
 
-    iaqFifo.enqueue(airQuality.iaq);
-
-    float iaqSum = 0.0;
-    for (int n = 0; n < iaqFifo.count(); n++) {
-      iaqSum += iaqFifo.peek();
-    }
-    airQuality.iaqSmooth = iaqSum/iaqFifo.count();
-
     // serial out log
     writeLog();
 
@@ -158,7 +147,6 @@ void writeLog() {
     output += ", rHumi:" + String(airQuality.humidity);
     //output += ", gasRe: " + String(airQuality.gasResistance);
     output += ", iaq:" + String(airQuality.iaq);
-    output += ", iaqSmooth:" + String(airQuality.iaqSmooth);
     output += ", iaqAc:" + String(airQuality.accuracy);
     output += ", temp:" + String(airQuality.temperature);
     output += ", humi:" + String(airQuality.humidity);
@@ -275,7 +263,6 @@ void handleDataAsJson() {
   dataObj["humidity"] = roundf(airQuality.humidity * 100.0) / 100.0;
   dataObj["pressure"] = roundf(airQuality.pressure * 100.0) / 100.0;
   dataObj["iaq"] = roundf(airQuality.iaq * 100.0) / 100.0;
-  dataObj["iaqSmooth"] = roundf(airQuality.iaqSmooth * 100.0) / 100.0;
   dataObj["iaqAccuracy"] = airQuality.accuracy;
   dataObj["co2"] = roundf(airQuality.co2 * 100.0) / 100.0;
   dataObj["voc"] = roundf(airQuality.voc * 100.0) / 100.0;
